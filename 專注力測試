@@ -1,0 +1,158 @@
+import pygame
+import random
+pygame.init()
+WIDTH, HEIGHT = 1400, 800
+FONT_SIZE = 100
+FONT = pygame.font.SysFont(None, FONT_SIZE)
+BLACK = (255, 255, 255)
+WHITE = (0, 0, 0)
+GRAY = (150, 150, 150)
+LETTERS = [chr(i) for i in range(65, 91)] 
+
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Conners CPT 3")
+clock = pygame.time.Clock()
+
+def generate_stimulus():
+    return random.choice(LETTERS)
+
+def display_stimulus(stimulus):
+    screen.fill(WHITE)
+    text = FONT.render(stimulus, True, BLACK)
+    text_rect = text.get_rect(center=(WIDTH/2, HEIGHT/2))
+    screen.blit(text, text_rect)
+    pygame.display.flip()
+
+def draw_timer(timer):
+    minutes = timer // 60
+    seconds = timer % 60
+    timer_text = FONT.render(f"Time Left: {minutes:02d}:{seconds:02d}", True, BLACK)
+    timer_rect = timer_text.get_rect(topright=(WIDTH - 10, 10))
+    screen.blit(timer_text, timer_rect)
+
+
+def show_results(stimulus_x_count, stimulus_y_count, stimulus_z_count, total_reaction_time, average_reaction_time, correct_count, error_count, total_xyz_count):
+    screen.fill(WHITE)
+    result_text = [
+        f"Game Over",
+        "",
+        f"Average Reaction Time for 'X,Y,Z': {average_reaction_time} ms",
+        "",
+        f"Correct Count: {correct_count}",
+        "",
+        f"Error Count: {error_count}",
+        "",
+        f"Total XYZ Count: {total_xyz_count}"
+    ]
+    y_offset = 100
+    for text in result_text:
+        result_surface = FONT.render(text, True, BLACK)
+        result_rect = result_surface.get_rect(center=(WIDTH/2, y_offset))
+        screen.blit(result_surface, result_rect)
+        y_offset += 50
+    pygame.display.flip()
+
+def main():
+    running = False
+    reaction_times = []
+    total_reaction_time = 0
+    stimulus_x_count = 0  
+    stimulus_y_count = 0  
+    stimulus_z_count = 0  
+    total_xyz_count = 0  
+    correct_count = 0  
+    error_count = 0  
+    last_stimulus_time = 0
+    start_time = 0
+    prev_timer = None
+    button_rect1 = pygame.Rect(WIDTH / 4 - 50, HEIGHT / 2 - 50, 240, 120)
+    button_rect2 = pygame.Rect(3 * WIDTH / 4 - 50, HEIGHT / 2 - 50, 240, 120)
+    last_button_click_time = 0
+    
+    while True:
+        screen.fill(WHITE)
+        if not running:
+            pygame.draw.rect(screen, GRAY, button_rect1)            
+            button_text1 = FONT.render("START", True, BLACK)
+            button_text_rect1 = button_text1.get_rect(center=button_rect1.center)
+            screen.blit(button_text1, button_text_rect1)
+
+        else:
+            timer = max(0, int(14 * 60 - (pygame.time.get_ticks() - start_time) / 1000))
+            draw_timer(timer)
+            pygame.draw.rect(screen, GRAY, button_rect2)
+            button_text2 = FONT.render("CLICK", True, BLACK)
+            button_text_rect2 = button_text2.get_rect(center=button_rect2.center)
+            screen.blit(button_text2, button_text_rect2)
+            
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not running:
+                if button_rect1.collidepoint(event.pos):
+                    running = True
+                    last_stimulus_time = pygame.time.get_ticks()
+                    start_time = pygame.time.get_ticks()
+                    draw_timer(max(0, int(14 * 60 - (pygame.time.get_ticks() - start_time) / 1000)))
+                elif button_rect2.collidepoint(event.pos):
+                    last_button_click_time = pygame.time.get_ticks()
+                    current_time = pygame.time.get_ticks()
+                    reaction_time = current_time - last_stimulus_time
+                    reaction_times.append(reaction_time)
+                    if reaction_time >= 1000:
+                        if stimulus == 'X' or stimulus == 'Y' or stimulus == 'Z':
+                            total_reaction_time += reaction_time
+                            correct_count += 1
+                        else:
+                            error_count += 1
+                    last_stimulus_time = current_time
+            elif running and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                x, y = event.pos
+                if 3 * WIDTH/4 - 50 < x < 3 * WIDTH/4 + 50 and HEIGHT/2 - 50 < y < HEIGHT/2 + 50:
+                    current_time = pygame.time.get_ticks()
+                    reaction_time = current_time - last_stimulus_time
+                    reaction_times.append(reaction_time)
+                    if stimulus == 'X' or stimulus == 'Y' or stimulus == 'Z':
+                        total_reaction_time += reaction_time
+                        correct_count += 1  
+                    else:
+                        error_count += 1
+                    last_stimulus_time = current_time
+                elif 3 * WIDTH/4 - 50 < x < 3 * WIDTH/4 + 50 and HEIGHT/2 - 50 < y < HEIGHT/2 + 50:
+                    current_time = pygame.time.get_ticks()
+                    reaction_time = current_time - last_button_click_time
+                    reaction_times.append(reaction_time)        
+        if running:
+            current_time = pygame.time.get_ticks()
+            if current_time - last_stimulus_time >= 1000:
+                stimulus = generate_stimulus()
+                display_stimulus(stimulus)
+                last_stimulus_time = current_time
+                if stimulus in ['X', 'Y', 'Z']:
+                    total_xyz_count += 1
+        if running and pygame.time.get_ticks() - start_time >= 14 * 60 * 1000:
+            running = False
+            correct_count = int(correct_count)
+            if correct_count != 0:
+                average_reaction_time = total_reaction_time / correct_count
+            else:
+                average_reaction_time = 0
+            show_results(stimulus_x_count, stimulus_y_count, stimulus_z_count, total_reaction_time, average_reaction_time, correct_count, error_count, total_xyz_count)
+            while True:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        pygame.quit()
+                        return
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                        pygame.quit()
+                        return
+                pygame.display.flip()
+                clock.tick(60)
+            break
+        clock.tick(60)
+        
+if __name__ == "__main__":
+    main()
